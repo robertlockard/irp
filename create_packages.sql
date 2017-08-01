@@ -653,6 +653,7 @@ AS
     IF nvl(pOverRide,'Y') != 'Y' AND pOverRide != 'N' THEN
       RAISE_APPLICATION_ERROR(-20003, 'Override must be Y or N');
     END IF;
+
     SELECT irp.irp_chameleon_seq.NEXTVAL
     INTO iChemId
     FROM dual;

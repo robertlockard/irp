@@ -1,7 +1,6 @@
 --
 -- 
 --
-
 create or replace FUNCTION irp.irp_next_part(pString IN VARCHAR2, pPos IN NUMBER, iNbrDelim IN NUMBER)
 RETURN VARCHAR2 IS
 
@@ -570,7 +569,7 @@ END;
 --  DDL for Package IRP_CHAMELEON
 --------------------------------------------------------
 
-CREATE OR REPLACE EDITIONABLE PACKAGE "IRP"."IRP_CHAMELEON" 
+  CREATE OR REPLACE EDITIONABLE PACKAGE "IRP"."IRP_CHAMELEON" 
 AS
 FUNCTION fInsChameleon(pIRPNbr 		IN NUMBER,
                         pusdotnbr 	IN VARCHAR2,
@@ -613,6 +612,9 @@ FUNCTION irp_name(pfname    IN VARCHAR2,
 FUNCTION irp_vehicle(pvin     IN VARCHAR2,
                      pirpnbr  IN INTEGER) RETURN NUMBER;
 --
+FUNCTION irp_company(pirpnbr    IN INTEGER,
+                     pCompany   IN VARCHAR2) RETURN NUMBER;
+--
 FUNCTION irp_override_chameleon(pChemId INTEGER,
                                 pnote   CLOB) RETURN INTEGER;
 --
@@ -624,7 +626,11 @@ FUNCTION fchameleonscorethreshold RETURN INTEGER;
 END irp_chameleon;
 /
 
-create or replace PACKAGE BODY IRP.irp_chameleon
+--------------------------------------------------------
+--  DDL for Package Body IRP_CHAMELEON
+--------------------------------------------------------
+
+  CREATE OR REPLACE EDITIONABLE PACKAGE BODY "IRP"."IRP_CHAMELEON" 
 AS
   -- 20170228.1   initial version. the package is setup to test
   --              for phone number, address and email. this package
@@ -647,11 +653,10 @@ AS
     IF nvl(pOverRide,'Y') != 'Y' AND pOverRide != 'N' THEN
       RAISE_APPLICATION_ERROR(-20003, 'Override must be Y or N');
     END IF;
-  
     SELECT irp.irp_chameleon_seq.NEXTVAL
     INTO iChemId
     FROM dual;
-  
+
 		INSERT INTO irp.irp_chameleons VALUES (
                             iChemId,
                             pIRPNbr,
@@ -751,7 +756,7 @@ AS
       iTest NUMBER; 	-- the counter to test to see if the phone already exists.
                       -- we are reusing iTest to get the return value from irp_lookups.
       iLog INTEGER;   -- log id
-      
+
 	BEGIN
 
     -- test to see if the phone number exists and if the carrier is
@@ -895,7 +900,7 @@ AS
     RAISE_APPLICATION_ERROR(-20000,'An error was raised, check the error ' 
                 || 'log #: ' || iLog);
 	END irp_name;
-  
+
   FUNCTION irp_name(pfname IN VARCHAR2,
                     pmname IN VARCHAR2 DEFAULT NULL,
                     plname IN VARCHAR2,
@@ -905,7 +910,7 @@ AS
   nscore        NUMBER;   -- the score we are going to return.
   nTmp          NUMBER;   -- just a temporary variable.
   BEGIN
-  
+
     -- validate the input. check to see the string does not
     -- contain any sql key words. if they do, then raise
     -- and error.
@@ -933,14 +938,14 @@ AS
       FROM irp.irp_common_names
       WHERE name_variation = pfname;
       -- we had a match. 
-      
+
     exception WHEN no_data_found THEN
       -- this is an expected condition
       nProbability := 1;
     WHEN too_many_rows THEN
       nprobability := 1;
     END;
-    
+
     -- is the last name a common name?
     BEGIN
       SELECT probability 
@@ -948,7 +953,7 @@ AS
       FROM irp.irp_common_names
       WHERE NAME = plname;
       nprobability := nvl(nprobability,1) * ntmp;
-      
+
     exception WHEN no_data_found THEN
       -- this is an expected condition.
       IF nvl(nprobability,1) = 1 THEN
@@ -1050,24 +1055,23 @@ AS
   FUNCTION irp_override_chameleon(pChemId INTEGER,
                                   pNote   CLOB) RETURN INTEGER IS
 	PRAGMA AUTONOMOUS_TRANSACTION;
-  iLog  INTEGER; -- ERROR LOG
-  iNoteId INTEGER; 
+  ilog  INTEGER; -- ERROR LOG
+  iNoteId   INTEGER;
   BEGIN
     UPDATE irp.irp_chameleons SET IRP_CHA_OVERRIDE = 'Y'
     WHERE irp_cha_id = pChemId;
-    
-    iNoteId := irp.irp_api_notes.pInsNote(pChemId => pChemId,
-                                          pNote   => pNote);
+
+    iNoteId := irp.irp_api_notes.fInsNote(pChemId => pChemId,
+                                        pnote   => pnote);
     COMMIT;
     RETURN iNoteId;
   EXCEPTION WHEN OTHERS THEN
-    ROLLBACK;
     UTILITY.ERRORSTACK_PKG.pMain(pErrorId => iLog);
     RAISE_APPLICATION_ERROR(-20000,'An error was raised, check the error ' 
                 || 'log #: ' || iLog);
     RETURN -1;
   END irp_override_chameleon;
-  
+
 -- will return the number of vehicles that match the VIN.
   FUNCTION fcheckvehicle(pvin       IN VARCHAR2,
                          pirpnbr    IN INTEGER) RETURN NUMBER IS
@@ -1120,9 +1124,24 @@ AS
     RAISE_APPLICATION_ERROR(-20002,NULL);
   END fchameleonscorethreshold;
 
-END irp_chameleon;
-/
+  FUNCTION irp_company(pirpnbr    IN INTEGER,
+                        pcompany   IN VARCHAR2) RETURN NUMBER AS
+  iTest     INTEGER;
+  BEGIN
+    SELECT count(*)
+    INTO iTest
+    FROM irp.irp_applicants
+    WHERE soundex(irp_app_company) = soundex(pcompany);
+    IF itest > 0 THEN
+        RETURN 1;
+    ELSE
+        RETURN 0;
+    end if;
+  END irp_company;
 
+END irp_chameleon;
+
+/
 
   CREATE OR REPLACE EDITIONABLE PACKAGE BODY "IRP"."IRP_API_NOTES" AS
   function finsnote(pchemid in number,
